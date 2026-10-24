@@ -1,5 +1,7 @@
 # request-mirroring — Claude Code skill
 
+> 🇺🇿 **O'zbekcha oddiy tushuntirish:** [QOLLANMA.md](QOLLANMA.md)
+
 Safely replace **any HTTP backend, in any language** — Python → Python (v1 → v2), Python → Go, Node → Go, framework or runtime upgrades, monolith → service — by mirroring **real production traffic** to the new implementation and comparing every response, without the new one ever answering a user or touching production data. Results (parity %, every differing response, latency and RAM/CPU of both) are shown in **Grafana**.
 
 ```
