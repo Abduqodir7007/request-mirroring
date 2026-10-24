@@ -30,7 +30,7 @@ services:
     networks: [app_net]
 
   fake:
-    image: shadow_faketg:latest
+    image: shadow_fakeapi:latest
     container_name: shadow_fake
     restart: unless-stopped
     env_file: [fake.env]          # MIRROR_TG_BOT_TOKEN, MIRROR_TG_CHAT_ID (optional digest to a test chat)

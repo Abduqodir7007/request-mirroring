@@ -1,0 +1,57 @@
+# Self-contained demo: Python v1 (primary) vs Python v2 (shadow) behind the shadow proxy,
+# with a load generator, Prometheus and a provisioned Grafana dashboard.
+#
+#   cd example && docker compose up -d --build
+#   open http://127.0.0.1:3000  (admin / admin)  → Dashboards → Mirror → "Demo: Python v1 vs Python v2"
+#   proxy diff page: http://127.0.0.1:9187/diffs
+#   docker compose down -v      # remove everything
+#
+# v2 differs on purpose: /api/items is sorted the other way (body_diff), every 10th item has its
+# price as a string (body_diff), empty-password login returns 401 instead of 400 (status_diff),
+# and it answers faster (latency panels). `updated_at` and `token` differ per call and are ignored.
+name: mirror_demo
+
+services:
+  app_v1:
+    image: python:3.12-alpine
+    environment: { VERSION: v1, PYTHONUNBUFFERED: "1" }
+    volumes: ["./app:/app:ro"]
+    command: ["python", "/app/app.py"]
+
+  app_v2:
+    image: python:3.12-alpine
+    environment: { VERSION: v2, PYTHONUNBUFFERED: "1" }
+    volumes: ["./app:/app:ro"]
+    command: ["python", "/app/app.py"]
+
+  proxy:
+    build: { context: ../tool, target: proxy }
+    environment:
+      SERVICE: demo
+      PRIMARY_URL: http://app_v1:8000
+      SHADOW_URL: http://app_v2:8000
+      ADMIN_ALLOW: 127.0.0.1/32,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+    ports: ["127.0.0.1:8019:8019", "127.0.0.1:9187:9187"]
+    depends_on: [app_v1, app_v2]
+
+  load:
+    image: python:3.12-alpine
+    volumes: ["./app:/app:ro"]
+    command: ["python", "/app/load.py"]
+    depends_on: [proxy]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource 3.7.1"   # pinned: 4.x needs Grafana >= 11.6.11
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus]

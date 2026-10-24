@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://mirror_prometheus:9090
+    isDefault: true
+
+  # Reads the proxies' /diffs.json for the "Differences" table. The URLs themselves are set in the
+  # dashboard (gen_dashboard.py config "diffs_urls"); the uid must match config "infinity_uid".
+  - name: Shadow diffs
+    uid: shadow-infinity
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    jsonData: {}

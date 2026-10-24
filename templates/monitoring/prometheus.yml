@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # One target per shadow proxy (container name works because Prometheus is on the same network).
+  - job_name: shadow
+    static_configs:
+      - targets: ["shadow_proxy_core:9187"]
+      # - targets: ["shadow_proxy_auth:9187"]
+      # - targets: ["OTHER_HOST:9187"]          # proxy on another server (firewall 9187 to this host)
+
+  # Container RAM/CPU: cAdvisor v0.53+ or tool/cmd/cgstats on each app host.
+  # - job_name: cadvisor_shadow
+  #   static_configs:
+  #     - targets: ["APP_HOST:8080"]

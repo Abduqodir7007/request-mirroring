@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Abduqodir7007/request-mirroring/tool/internal/faketg"
+	"github.com/Abduqodir7007/request-mirroring/tool/internal/fakeapi"
 	"github.com/Abduqodir7007/request-mirroring/tool/internal/metrics"
 )
 
@@ -30,9 +30,9 @@ func run(logger *slog.Logger) error {
 	reg := metrics.NewRegistry()
 	realAPI := env("REAL_TELEGRAM_API_URL", "https://api.telegram.org")
 
-	var rec *faketg.Recorder
+	var rec *fakeapi.Recorder
 	if path := env("RECORD_PATH", "/data/calls.jsonl"); path != "" {
-		r, err := faketg.NewRecorder(path, int64(envInt("RECORD_MAX_MB", 100))<<20)
+		r, err := fakeapi.NewRecorder(path, int64(envInt("RECORD_MAX_MB", 100))<<20)
 		if err != nil {
 			return err
 		}
@@ -40,15 +40,15 @@ func run(logger *slog.Logger) error {
 		rec = r
 	}
 
-	var mirror *faketg.Mirror
+	var mirror *fakeapi.Mirror
 	if token, chat := os.Getenv("MIRROR_TG_BOT_TOKEN"), os.Getenv("MIRROR_TG_CHAT_ID"); token != "" && chat != "" {
-		mirror = faketg.NewMirror(faketg.MirrorOptions{RealAPI: realAPI, Token: token, ChatID: chat,
+		mirror = fakeapi.NewMirror(fakeapi.MirrorOptions{RealAPI: realAPI, Token: token, ChatID: chat,
 			Interval: envDuration("MIRROR_INTERVAL", time.Minute), Examples: envInt("MIRROR_EXAMPLES", 4),
 			Logger: logger, Metrics: reg})
 		go mirror.Run(ctx)
 	}
 
-	srv := faketg.New(faketg.Options{RealAPI: realAPI, Passthrough: env("PASSTHROUGH_READS", "true") == "true",
+	srv := fakeapi.New(fakeapi.Options{RealAPI: realAPI, Passthrough: env("PASSTHROUGH_READS", "true") == "true",
 		PassthroughTTL: envDuration("PASSTHROUGH_TTL", 10*time.Minute), Recorder: rec, Mirror: mirror,
 		Metrics: reg, Logger: logger})
 

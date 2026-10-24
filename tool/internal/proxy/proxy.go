@@ -305,7 +305,7 @@ func (p *Proxy) finish(route, method, path string, c *capture, pyDur time.Durati
 	svc := p.opts.Service
 	if res.err == nil {
 		p.requests.Inc(svc, "shadow", route, method, strconv.Itoa(res.status))
-		p.durations.Observe(res.dur.Seconds(), svc, "go", route, method)
+		p.durations.Observe(res.dur.Seconds(), svc, "shadow", route, method)
 	}
 	d := Diff{Time: time.Now(), Service: svc, Method: method, Route: route, Path: path,
 		PyStatus: c.status, GoStatus: res.status, PyMillis: ms(pyDur), GoMillis: ms(res.dur)}

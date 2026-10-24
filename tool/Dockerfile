@@ -9,15 +9,15 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
-RUN go build -trimpath -ldflags="-s -w" -o /out/faketg ./cmd/faketg && \
+RUN go build -trimpath -ldflags="-s -w" -o /out/fakeapi ./cmd/fakeapi && \
     go build -trimpath -ldflags="-s -w" -o /out/proxy ./cmd/proxy && \
     go build -trimpath -ldflags="-s -w" -o /out/cgstats ./cmd/cgstats
 
-FROM gcr.io/distroless/static-debian12:nonroot AS faketg
-COPY --from=build /out/faketg /usr/local/bin/faketg
+FROM gcr.io/distroless/static-debian12:nonroot AS fakeapi
+COPY --from=build /out/fakeapi /usr/local/bin/fakeapi
 USER nonroot:nonroot
 EXPOSE 8081
-ENTRYPOINT ["/usr/local/bin/faketg"]
+ENTRYPOINT ["/usr/local/bin/fakeapi"]
 
 FROM gcr.io/distroless/static-debian12:nonroot AS proxy
 COPY --from=build /out/proxy /usr/local/bin/proxy

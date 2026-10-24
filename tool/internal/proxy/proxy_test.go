@@ -77,6 +77,15 @@ func TestClientGetsPrimaryAndMatch(t *testing.T) {
 	if goBody.Load() != `{"q":1}` {
 		t.Fatalf("go body %v", goBody.Load())
 	}
+	var out bytes.Buffer
+	reg.Write(&out)
+	for _, backend := range []string{"primary", "shadow"} {
+		for _, metric := range []string{"shadow_requests_total{", "shadow_request_duration_seconds_count{"} {
+			if !strings.Contains(out.String(), metric+`service="bot",backend="`+backend+`"`) {
+				t.Fatalf("missing %s backend=%s\n%s", metric, backend, out.String())
+			}
+		}
+	}
 }
 
 func TestStatusDiffAndMasking(t *testing.T) {

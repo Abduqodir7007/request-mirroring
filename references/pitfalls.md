@@ -4,7 +4,7 @@
 
 2. **AI / LLM calls are external writes too.** They cost money and can create data. Point the AI base URL at the fake `/ai/` (returns `[]`), use a dummy key, and flush any AI response cache in the shadow Redis.
 
-3. **`docker compose run migrate` used the prod env.** The migrate service of the new compose reads `.env.prod`. Run migrations against the shadow with `docker run --rm --network NET -e DATABASE_URL=<shadow> <migrate-image> up`, never through the compose file.
+3. **The migrate step used the prod env.** `docker compose run migrate` (or `manage.py migrate` inside a container started from the prod compose) reads `.env.prod` — new migrations land on the production database while the old service still runs on it. Run migrations with `docker run --rm --network NET --env-file .env.shadow <new-image> <migrate cmd>`.
 
 4. **CRLF builds.** Images built from a Windows checkout (`git archive` / `core.autocrlf=true`) had CRLF in embedded data files (a common-passwords list), so a validation silently stopped working and showed up as a diff. Build on Linux or with LF.
 
@@ -24,4 +24,8 @@
 
 12. **Two writers, one database.** Never run old and new against the same prod DB with different schemas/migrations — the shadow must have its own copy; the cutover is a hard switch.
 
-13. **Monitoring ports.** The proxy admin port and exporters expose route names and response bodies. `ADMIN_ALLOW` = monitoring IP only, plus a firewall rule.
+13. **Grafana plugin version.** The newest Infinity plugin (4.x) installs on Grafana 11.3 without error, but the panel shows "Datasource … was not found" (browser console: `react/jsx-runtime` 404). Pin a version whose `grafanaDependency` matches your Grafana (3.7.1 for 11.3).
+
+14. **One mislabelled metric hides a whole series.** A leftover backend label (`go` instead of `shadow`) made every shadow latency panel say "No data" while request counts looked fine. After any change to the proxy, check `/metrics` shows both `backend="primary"` and `backend="shadow"` for every metric, and look at the dashboard, not only at the API.
+
+15. **Monitoring ports.** The proxy admin port and exporters expose route names and response bodies. `ADMIN_ALLOW` = monitoring IP only, plus a firewall rule.

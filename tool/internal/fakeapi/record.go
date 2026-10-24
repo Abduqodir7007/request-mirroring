@@ -1,4 +1,4 @@
-package faketg
+package fakeapi
 
 import (
 	"encoding/json"

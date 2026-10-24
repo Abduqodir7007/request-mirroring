@@ -1,4 +1,4 @@
-package faketg
+package fakeapi
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func NewMirror(opts MirrorOptions) *Mirror {
 		opts.Client = &http.Client{Timeout: 15 * time.Second}
 	}
 	return &Mirror{opts: opts, counts: map[string]int{}, bots: map[string]int{},
-		sent: opts.Metrics.Counter("faketg_mirror_messages_total", "Digest messages sent to the shadow Telegram group", "result")}
+		sent: opts.Metrics.Counter("fakeapi_mirror_messages_total", "Digest messages sent to the shadow Telegram group", "result")}
 }
 
 func (m *Mirror) Add(ev Event) {

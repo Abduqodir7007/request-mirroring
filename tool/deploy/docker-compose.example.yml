@@ -2,7 +2,7 @@ name: app_shadow
 
 services:
   fake:
-    image: ${FAKE_IMAGE:-shadow_faketg:latest}
+    image: ${FAKE_IMAGE:-shadow_fakeapi:latest}
     container_name: shadow_fake
     restart: unless-stopped
     env_file: [fake.env]

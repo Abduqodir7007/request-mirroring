@@ -32,7 +32,7 @@ If two app stacks live on different networks (e.g. a second service), attach the
 - Same major version as prod (or newer) so `pg_dump | psql` restores cleanly.
 - Large tables: dump schema + small tables fully, big append-only tables only for the last N days.
 
-## Shadow Redis
+## Shadow cache (Redis/Memcached)
 
 `redis-server --save "" --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru` — pure cache, never persisted. Clear keys the new service caches from external calls when you change fakes (e.g. cached AI answers).
 
@@ -50,7 +50,7 @@ Both services create rows independently, so the copies drift: the shadow assigns
 2. stop the shadow app(s) (trap restarts them on any error);
 3. `DROP DATABASE … WITH (FORCE)` + `CREATE DATABASE` on the shadow PG;
 4. `pg_dump` from prod (read-only) piped into the shadow;
-5. run the new service's migrations against the shadow only;
+5. run the new service's migrate command against the shadow only (`docker run --env-file .env.shadow <image> <cmd>`, see the runbook table);
 6. start the shadow app(s); log counts.
 
 During the ~20 s window the proxy records `shadow_error` — expected, ignore it in triage.

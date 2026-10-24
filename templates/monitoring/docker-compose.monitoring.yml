@@ -1,0 +1,51 @@
+# Prometheus + Grafana with everything provisioned — for hosts that have no monitoring yet.
+# If you already run Prometheus/Grafana, add the scrape jobs (../prometheus/scrape.yml) and
+# import the dashboard (../grafana/import.sh) instead.
+#
+#   cp -r templates/monitoring /srv/mirror-monitoring && cd /srv/mirror-monitoring
+#   edit prometheus.yml (targets) and grafana/provisioning/datasources/datasources.yml (diffs URL)
+#   python3 ../grafana/gen_dashboard.py config.json grafana/dashboards/mirror.json
+#   GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 12) docker compose -f docker-compose.monitoring.yml up -d
+#
+# Grafana: http://127.0.0.1:3000 (tunnel it: ssh -L 3000:127.0.0.1:3000 host). Never publish 3000/9090 publicly.
+name: mirror_monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: mirror_prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 512m
+    networks: [app_net]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: mirror_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource 3.7.1"   # pinned: 4.x needs Grafana >= 11.6.11
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    mem_limit: 512m
+    networks: [app_net]
+
+networks:
+  app_net:
+    name: shared_net        # same network as the shadow proxies → scrape them by container name
+    external: true
+
+volumes:
+  prom_data:
+  grafana_data:

@@ -62,7 +62,7 @@ Admin endpoints: `/metrics`, `/diffs` (HTML, newest first), `/diffs.json` (for G
 | `MAX_COMPARE_KB` | `2048` | larger responses → `skipped` |
 | `IGNORE_KEYS`, `MASK_KEYS`, `SHADOW_BODY_REPLACE`, `DIFFS_KEEP` (1000) | | see above |
 
-## Fake external APIs (`tool/cmd/faketg`)
+## Fake external APIs (`tool/cmd/fakeapi`)
 
 The shadow must not send SMS, Telegram messages, AI requests, webhooks or payments. Point every such URL of the shadow service at the fake:
 
@@ -73,10 +73,10 @@ The shadow must not send SMS, Telegram messages, AI requests, webhooks or paymen
 | `/sink/<name>` | accepts anything, returns `200 {"ok":true}` — use for outgoing webhooks |
 | `/myid/...` | 503 — pattern for an identity provider you must not call |
 
-Optionally it posts a digest of what the shadow *would* have sent to a test chat every `MIRROR_INTERVAL` (`MIRROR_TG_BOT_TOKEN`, `MIRROR_TG_CHAT_ID`). Add more stubs in `internal/faketg/server.go` for other providers (SMS, payments) the same way.
+Optionally it posts a digest of what the shadow *would* have sent to a test chat every `MIRROR_INTERVAL` (`MIRROR_TG_BOT_TOKEN`, `MIRROR_TG_CHAT_ID`). Add more stubs in `internal/fakeapi/server.go` for other providers (SMS, payments) the same way.
 
 ## Resource comparison
 
 - cAdvisor (`ghcr.io/google/cadvisor` ≥ v0.53 for Docker 29) gives `container_memory_working_set_bytes`, `container_cpu_usage_seconds_total`.
 - When cAdvisor can't read the containerd snapshotter ("failed to identify the read-write layer ID"), run `tool/cmd/cgstats` instead: same metric names from the Docker API + cgroup v2 (`docker.sock` and `/sys/fs/cgroup` read-only, host network, `ALLOW` = monitoring IP).
-- Compare **primary app + its workers (celery etc.)** vs the new service; leave DB/Redis out — they stay after cutover.
+- Compare **primary app + its workers** (celery, sidekiq, rq, queue consumers, cron containers…) vs **the new service + its workers**; leave DB/cache out — they stay after cutover.

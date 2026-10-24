@@ -1,4 +1,4 @@
-package faketg
+package fakeapi
 
 import (
 	"bytes"
@@ -73,7 +73,7 @@ func New(opts Options) *Server {
 	}
 	return &Server{
 		opts:    opts,
-		calls:   opts.Metrics.Counter("faketg_calls_total", "Bot API calls received by the fake Telegram", "bot", "method", "mode"),
+		calls:   opts.Metrics.Counter("fakeapi_calls_total", "Bot API calls received by the fake Telegram", "bot", "method", "mode"),
 		nextID:  map[string]int64{},
 		cache:   map[string]cached{},
 		botName: map[string]string{},

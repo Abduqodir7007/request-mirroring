@@ -1,11 +1,13 @@
 {
-  "title": "Shop: Python vs Go (mirror)",
-  "uid": "shop-mirror",
+  "title": "Orders API: v1 vs v2 (mirror)",
+  "uid": "orders-mirror",
+  "primary_label": "v1",
+  "shadow_label": "v2",
   "services": ["auth", "core"],
   "diffs_urls": ["http://APP_HOST:9187/diffs.json", "http://APP_HOST:9188/diffs.json"],
   "infinity_uid": "shadow-infinity",
   "containers": [
-    {"service": "auth", "primary": "auth_app|auth_celery_worker|auth_celery_beat", "shadow": "auth_go_app"},
-    {"service": "core", "primary": "core_app|core_celery_worker|core_celery_beat", "shadow": "core_go_app"}
+    {"service": "auth", "primary": "auth_v1_app|auth_v1_worker", "shadow": "auth_v2_app|auth_v2_worker"},
+    {"service": "core", "primary": "core_v1_app|core_v1_worker", "shadow": "core_v2_app"}
   ]
 }

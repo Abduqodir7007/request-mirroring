@@ -33,10 +33,12 @@ Write down:
 
 ## Phase 1 — images
 
+The new service: its own Dockerfile, whatever the language. The tooling:
+
 ```bash
 cd tool
 docker build --target proxy  -t shadow_proxy:$(git rev-parse --short HEAD) .
-docker build --target faketg -t shadow_faketg:$(git rev-parse --short HEAD) .
+docker build --target fakeapi -t shadow_fakeapi:$(git rev-parse --short HEAD) .
 docker build --target cgstats -t shadow_cgstats:$(git rev-parse --short HEAD) .   # only if cAdvisor fails
 ```
 
@@ -59,7 +61,26 @@ docker exec <prod_db> pg_dump -U <user> -d <db> --no-owner --no-privileges \
   | docker exec -i SHADOW_PG psql -v ON_ERROR_STOP=1 -U shadow -d app_shadow
 ```
 
-Run the **new** service's migrations against the copy only — with `docker run -e DATABASE_URL=<shadow>`; never via the compose file whose env points at prod (pitfalls #3).
+Run the **new** service's migrations against the copy only. Use the shadow's own image with the **shadow env file**, never a compose service whose env points at prod (pitfalls #3):
+
+```bash
+docker run --rm --network NET --env-file /path/to/new-service/.env.shadow <new-image> <migrate command>
+```
+
+| stack | migrate command (inside the new service's image) |
+|---|---|
+| Django | `python manage.py migrate --noinput` |
+| Flask/FastAPI + Alembic | `alembic upgrade head` |
+| Rails | `bin/rails db:migrate` |
+| Laravel | `php artisan migrate --force` |
+| Node + Prisma / Knex / TypeORM | `npx prisma migrate deploy` / `npx knex migrate:latest` / `npx typeorm migration:run -d dist/data-source.js` |
+| Go + goose / golang-migrate | `goose -dir migrations postgres "$DATABASE_URL" up` / `migrate -path migrations -database "$DATABASE_URL" up` |
+| Java/Kotlin + Flyway / Liquibase | `flyway migrate` / `liquibase update` (or the app's `--spring.flyway.enabled=true` startup) |
+| no schema change (same app, new runtime) | nothing — the copy is already the right schema |
+
+Same-language upgrades (v1 → v2 of one codebase) are the common case where v2 brings new migrations: they must hit the shadow copy only, or v1 in production breaks.
+
+Databases other than Postgres: same idea with the engine's dump/restore (`mysqldump | mysql`, `mongodump --archive | mongorestore --archive`), into a shadow container of the same engine.
 
 Then install `templates/scripts/shadow-db-refresh.sh` as a cron (every 30–60 min) so the copy doesn't drift (see `shadow-data.md`).
 
@@ -85,10 +106,11 @@ curl -s 127.0.0.1:9187/metrics | grep shadow_compare_total
 curl -s 127.0.0.1:9187/diffs.json | head
 ```
 
-## Phase 5 — monitoring
+## Phase 5 — Grafana
 
-- Prometheus: add jobs from `templates/prometheus/scrape.yml`; open 9187 (and 8080 for cAdvisor/cgstats) only to `MON_IP` (`ADMIN_ALLOW` + firewall).
-- Grafana: `python3 templates/grafana/gen_dashboard.py config.json dashboard.json` and import. For the diff table install the Infinity datasource plugin and point it at `http://<host>:9187/diffs.json`.
+Follow `grafana.md`: either add scrape jobs + Infinity datasource + generated dashboard to the existing Prometheus/Grafana, or start the bundled `templates/monitoring/` stack. Name the two sides the way the team talks about them (`primary_label: "Python v1"`, `shadow_label: "Python v2"`). Open 9187 (and 8080 for cAdvisor/cgstats) only to the Prometheus/Grafana host (`ADMIN_ALLOW` + firewall).
+
+Before phase 6, open the dashboard with a few hand-made requests through the proxy and confirm every panel has data — both latency series, both p95 stats, and the Differences table.
 
 ## Phase 6 — switch on
 

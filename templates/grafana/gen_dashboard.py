@@ -8,14 +8,19 @@ config.json (see config.example.json):
     diffs_urls            list of http://host:9187/diffs.json for the Infinity table (optional)
     infinity_uid          uid of the Infinity datasource (optional)
     containers            [{"service": "core", "primary": "regex", "shadow": "regex"}]  (optional, needs cAdvisor/cgstats)
+    primary_label         display name of the old service, e.g. "Python v1" (default "primary")
+    shadow_label          display name of the new service, e.g. "Python v2" (default "shadow")
 """
 import json
+import re
 import sys
 
 cfg = json.load(open(sys.argv[1], encoding="utf-8"))
 DS = {"type": "prometheus", "uid": "${ds}"}
 F = 'service=~"$service", route=~"$route"'
 PRIMARY, SHADOW = "#3274D9", "#00ADD8"
+PN = cfg.get("primary_label", "primary")
+SN = cfg.get("shadow_label", "shadow")
 _id = 0
 
 
@@ -40,9 +45,9 @@ def target(expr, legend="", ref="A", instant=False, fmt=None):
 
 def color_overrides():
     return [
-        {"matcher": {"id": "byRegexp", "options": "(?i).*primary.*"},
+        {"matcher": {"id": "byRegexp", "options": f"^{re.escape(PN)}( .*)?$|.* · {re.escape(PN)}$"},
          "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": PRIMARY}}]},
-        {"matcher": {"id": "byRegexp", "options": "(?i).*shadow.*"},
+        {"matcher": {"id": "byRegexp", "options": f"^{re.escape(SN)}( .*)?$|.* · {re.escape(SN)}$"},
          "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": SHADOW}}]},
     ]
 
@@ -80,12 +85,12 @@ panels, y = [], 0
 
 panels.append(row("Overview ($service)", y)); y += 1
 panels += [
-    stat("Parity", q('100 * sum(increase(shadow_compare_total{$F, result="match"}[$__range])) / clamp_min(sum(increase(shadow_compare_total{$F, result!="skipped"}[$__range])), 1)'),
+    stat("Parity", q('100 * (sum(increase(shadow_compare_total{$F, result="match"}[$__range])) or vector(0)) / clamp_min(sum(increase(shadow_compare_total{$F, result!="skipped"}[$__range])), 1)'),
          0, y, unit="percent", decimals=2, steps=PARITY, desc="Share of compared requests where primary and shadow answered the same. Cutover target: >= 99.5 %"),
     stat("Compared", q('sum(increase(shadow_compare_total{$F, result!="skipped"}[$__range]))'), 4, y, decimals=0),
-    stat("Differences", q('sum(increase(shadow_compare_total{$F, result=~"body_diff|status_diff"}[$__range]))'), 8, y, decimals=0,
+    stat("Differences", q('sum(increase(shadow_compare_total{$F, result=~"body_diff|status_diff"}[$__range])) or vector(0)'), 8, y, decimals=0,
          steps=[{"color": "green", "value": None}, {"color": "orange", "value": 1}]),
-    stat("Shadow error / timeout", q('sum(increase(shadow_compare_total{$F, result=~"shadow_error|shadow_timeout"}[$__range]))'), 12, y, decimals=0,
+    stat("Shadow error / timeout", q('sum(increase(shadow_compare_total{$F, result=~"shadow_error|shadow_timeout"}[$__range])) or vector(0)'), 12, y, decimals=0,
          steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}]),
     stat("p95 primary", q('histogram_quantile(0.95, sum by (le) (rate(shadow_request_duration_seconds_bucket{$F, backend="primary"}[$__range])))'), 16, y, unit="s"),
     stat("p95 shadow", q('histogram_quantile(0.95, sum by (le) (rate(shadow_request_duration_seconds_bucket{$F, backend="shadow"}[$__range])))'), 20, y, unit="s"),
@@ -112,7 +117,7 @@ panels.append({
         target(q('sum by (route) (increase(shadow_requests_total{$F, backend="primary"}[$__range]))'), ref="A", instant=True, fmt="table"),
         target(q('histogram_quantile(0.95, sum by (le, route) (rate(shadow_request_duration_seconds_bucket{$F, backend="primary"}[$__range])))'), ref="B", instant=True, fmt="table"),
         target(q('histogram_quantile(0.95, sum by (le, route) (rate(shadow_request_duration_seconds_bucket{$F, backend="shadow"}[$__range])))'), ref="C", instant=True, fmt="table"),
-        target(q('100 * sum by (route) (increase(shadow_compare_total{$F, result="match"}[$__range])) / clamp_min(sum by (route) (increase(shadow_compare_total{$F, result!="skipped"}[$__range])), 1)'), ref="D", instant=True, fmt="table")],
+        target(q('100 * (sum by (route) (increase(shadow_compare_total{$F, result="match"}[$__range])) or 0 * sum by (route) (increase(shadow_compare_total{$F, result!="skipped"}[$__range]))) / clamp_min(sum by (route) (increase(shadow_compare_total{$F, result!="skipped"}[$__range])), 1)'), ref="D", instant=True, fmt="table")],
     "transformations": [{"id": "merge"}, {"id": "organize", "options": {"excludeByName": {"Time": True}, "renameByName": {
         "route": "Endpoint", "Value #A": "Requests", "Value #B": "p95 primary", "Value #C": "p95 shadow", "Value #D": "Parity %"}}}],
     "fieldConfig": {"defaults": {}, "overrides": [
@@ -211,5 +216,25 @@ dash = {
     ]},
     "panels": panels,
 }
+WORD = re.compile(r"\b(primary|shadow)\b", re.IGNORECASE)
+LABELS = {"primary": PN, "shadow": SN}
+
+
+def relabel(node, key=None):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "renameByName" and isinstance(v, dict):
+                node[k] = {kk: WORD.sub(lambda m: LABELS[m.group(1).lower()], vv) for kk, vv in v.items()}
+            elif k in ("title", "legendFormat", "description", "text") and isinstance(v, str):
+                node[k] = WORD.sub(lambda m: LABELS[m.group(1).lower()], v)
+            else:
+                relabel(v, k)
+    elif isinstance(node, list):
+        for v in node:
+            relabel(v, key)
+
+
+relabel(dash["panels"])
+dash["title"] = cfg.get("title", f"{PN} vs {SN} (mirror)")
 json.dump(dash, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 print("panels:", len(panels))

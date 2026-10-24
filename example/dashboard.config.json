@@ -1,0 +1,9 @@
+{
+  "title": "Demo: Python v1 vs Python v2",
+  "uid": "mirror-demo",
+  "primary_label": "Python v1",
+  "shadow_label": "Python v2",
+  "services": ["demo"],
+  "diffs_urls": ["http://proxy:9187/diffs.json"],
+  "infinity_uid": "shadow-infinity"
+}

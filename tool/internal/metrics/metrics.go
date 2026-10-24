@@ -46,7 +46,7 @@ type Histogram struct {
 	name string
 }
 
-var DefaultBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+var DefaultBuckets = []float64{0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
 func (r *Registry) register(name, help, kind string, labels []string, bounds []float64) {
 	r.mu.Lock()
