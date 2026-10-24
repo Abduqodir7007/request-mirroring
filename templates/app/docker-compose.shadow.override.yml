@@ -1,0 +1,10 @@
+# Put next to the NEW service's production compose file as docker-compose.shadow.yml.
+# Same image, same network — only the env file changes (prod env stays untouched for the cutover).
+#
+#   docker compose --env-file .env.shadow -f docker-compose.prod.yml -f docker-compose.shadow.yml up -d --no-build app
+#
+# `!override` replaces the env_file list instead of appending to it (Docker Compose ≥ 2.24).
+services:
+  app:
+    env_file: !override
+      - .env.shadow

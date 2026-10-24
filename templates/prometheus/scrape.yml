@@ -1,0 +1,14 @@
+# Add to prometheus.yml under scrape_configs. Keep a backup of the file before editing.
+- job_name: shadow
+  scrape_interval: 15s
+  static_configs:
+    - targets: ["APP_HOST:9187"]          # one target per proxy (9187, 9188, ...)
+      labels: { server: app-host }
+
+# Container RAM/CPU (cAdvisor v0.53+ or tool/cmd/cgstats). Give it its own job name so
+# existing alert rules filtered on job="cadvisor" do not start firing for this host.
+- job_name: cadvisor_shadow
+  scrape_interval: 15s
+  static_configs:
+    - targets: ["APP_HOST:8080"]
+      labels: { server: app-host }

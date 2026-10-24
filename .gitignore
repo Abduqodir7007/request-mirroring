@@ -1,0 +1,7 @@
+*.env
+.env*
+!*.example
+server/
+__pycache__/
+*.exe
+dashboard.json

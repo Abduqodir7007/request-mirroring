@@ -1,0 +1,43 @@
+name: app_shadow
+
+services:
+  fake:
+    image: ${FAKE_IMAGE:-shadow_faketg:latest}
+    container_name: shadow_fake
+    restart: unless-stopped
+    env_file: [fake.env]
+    environment:
+      ADDR: ":8081"
+      RECORD_PATH: /data/calls.jsonl
+    volumes: [fake_data:/data]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    networks: [app_net]
+
+  proxy-api:
+    image: ${PROXY_IMAGE:-shadow_proxy:latest}
+    container_name: shadow_proxy_api
+    restart: unless-stopped
+    environment:
+      SERVICE: api
+      PRIMARY_URL: http://app_old:8000
+      SHADOW_URL: http://app_new:8000
+      ADMIN_ALLOW: 127.0.0.1/32,172.16.0.0/12,MON_IP/32
+    ports:
+      - "127.0.0.1:8019:8019"
+      - "0.0.0.0:9187:9187"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    networks: [app_net]
+
+networks:
+  app_net:
+    name: shared_net
+    external: true
+
+volumes:
+  fake_data:

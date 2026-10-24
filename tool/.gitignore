@@ -1,0 +1,6 @@
+*.env
+!*.env.example
+*.jsonl
+/bin/
+
+/server/

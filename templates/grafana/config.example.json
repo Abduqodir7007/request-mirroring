@@ -1,0 +1,11 @@
+{
+  "title": "Shop: Python vs Go (mirror)",
+  "uid": "shop-mirror",
+  "services": ["auth", "core"],
+  "diffs_urls": ["http://APP_HOST:9187/diffs.json", "http://APP_HOST:9188/diffs.json"],
+  "infinity_uid": "shadow-infinity",
+  "containers": [
+    {"service": "auth", "primary": "auth_app|auth_celery_worker|auth_celery_beat", "shadow": "auth_go_app"},
+    {"service": "core", "primary": "core_app|core_celery_worker|core_celery_beat", "shadow": "core_go_app"}
+  ]
+}

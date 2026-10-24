@@ -1,0 +1,95 @@
+# Shadow stack for request mirroring. Copy to SHADOW_DIR/docker-compose.yml and edit:
+#   - image tags (build them from tool/, see README)
+#   - APP_OLD / APP_NEW container names and ports
+#   - the external network name (must be the network APP_OLD and APP_NEW are on)
+#   - MON_IP in ADMIN_ALLOW
+# Secrets go to pg.env / fake.env (chmod 600), never into this file.
+name: app_shadow
+
+services:
+  proxy-core:
+    image: shadow_proxy:latest
+    container_name: shadow_proxy_core
+    restart: unless-stopped
+    environment:
+      SERVICE: core
+      PRIMARY_URL: http://APP_OLD:8000
+      SHADOW_URL: http://APP_NEW:8000
+      SKIP_PATHS: "^/core/(admin|swagger|schema|redoc|docs|static|media)(/|$)"
+      SHADOW_BODY_REPLACE: media-shadow=media
+      ADMIN_ALLOW: 127.0.0.1/32,172.16.0.0/12,MON_IP/32
+      # SHADOW_METHODS: GET,HEAD        # read-only first phase
+      # IGNORE_KEYS: created_at,updated_at,token,...
+    ports:
+      - "127.0.0.1:8019:8019"   # host nginx → proxy (omit when nginx runs on the same Docker network)
+      - "0.0.0.0:9187:9187"     # metrics/diffs, firewall it to MON_IP
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    networks: [app_net]
+
+  fake:
+    image: shadow_faketg:latest
+    container_name: shadow_fake
+    restart: unless-stopped
+    env_file: [fake.env]          # MIRROR_TG_BOT_TOKEN, MIRROR_TG_CHAT_ID (optional digest to a test chat)
+    environment:
+      ADDR: ":8081"
+      RECORD_PATH: /data/calls.jsonl
+      MIRROR_INTERVAL: 1m
+    volumes: [fake_data:/data]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    networks: [app_net]
+
+  pg:
+    image: postgres:17-alpine     # same major as prod or newer
+    container_name: shadow_pg
+    restart: unless-stopped
+    env_file: [pg.env]            # POSTGRES_USER, POSTGRES_PASSWORD
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=60", "-c", "work_mem=4MB", "-c", "synchronous_commit=off"]
+    mem_limit: 384m
+    volumes: [pg_data:/var/lib/postgresql/data]
+    networks: [app_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: shadow_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 64m
+    networks: [app_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  # Only if cAdvisor cannot read containers (Docker 29 + containerd snapshotter):
+  # cgstats:
+  #   image: shadow_cgstats:latest
+  #   container_name: cgstats
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   environment: { ADDR: ":8080", ALLOW: "127.0.0.1/32,MON_IP/32" }
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - /sys/fs/cgroup:/sys/fs/cgroup:ro
+  #   read_only: true
+
+networks:
+  app_net:
+    name: shared_net
+    external: true
+
+volumes:
+  pg_data:
+  fake_data:
